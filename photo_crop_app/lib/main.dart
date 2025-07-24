@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:photo_crop_app/croppage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,62 +33,118 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  File? _image;
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
-        title: Text(widget.title, style: theme.textTheme.titleLarge),
+        title: Text(widget.title),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
-        elevation: 0,
       ),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.crop,
-              size: 100,
-              color: theme.colorScheme.primary,
+        padding: const EdgeInsets.all(20.0),
+        child: Center(
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(height: 20),
-            Text(
-              'Select a photo to crop',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              width: double.infinity,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.crop,
+                    size: 100,
+                    color: Colors.deepPurple,
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  const Text(
+                    'Choose a photo to crop',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  imagePreviewWidget(),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      _chosePhoto(true);
+                    },
+                    icon: const Icon(Icons.photo),
+                    label: const Text('Pick from Gallery'),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      _chosePhoto(false);
+                    },
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Take a Photo'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(50),
+                    ),
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 30),
-            FilledButton.icon(
-              onPressed: () {
-                // Trigger photo picker logic here
-              },
-              icon: const Icon(Icons.photo_library),
-              label: const Text('Choose from Gallery'),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                textStyle: const TextStyle(fontSize: 16),
-              ),
-            ),
-            const SizedBox(height: 15),
-            OutlinedButton.icon(
-              onPressed: () {
-                // Trigger camera picker logic here
-              },
-              icon: const Icon(Icons.camera_alt),
-              label: const Text('Take a Photo'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                textStyle: const TextStyle(fontSize: 16),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+
+  void _chosePhoto(bool fromGallery) async{
+    final picker = ImagePicker();
+    
+    final pickedImage = await picker.pickImage(
+      source: fromGallery ? ImageSource.gallery : ImageSource.camera,
+      imageQuality: 100, // Enforces JPEG conversion
+      preferredCameraDevice: CameraDevice.rear,
+    );
+
+    if(pickedImage != null) {
+      
+      setState(() {
+        _image = File(pickedImage.path);
+      });
+    }
+  }
+
+  Widget imagePreviewWidget() {
+    return 
+    _image == null
+    ? SizedBox()
+    : ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+        child: GestureDetector(
+          onTap: () { 
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CropPage(image: _image!)),
+            );
+          
+          },
+          child: Image.file(  
+            File(_image!.path),
+            width: 200,
+            height: 200,
+            fit: BoxFit.cover,
+          ),
+        ),
+      
     );
   }
 }
