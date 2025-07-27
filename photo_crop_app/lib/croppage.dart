@@ -102,8 +102,24 @@ class _CropPageState extends State<CropPage> {
             ),
 
             IconButton(
-              onPressed: () {
-                _savePhoto();
+              onPressed: () async{
+                final result = await _savePhoto();
+                if(result == null) {
+                  if(context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(  
+                    SnackBar(content: Text('Image saved to gallery')),
+                    );
+                  }
+                  
+                }
+                else {
+                  if(context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to save image')),
+                    );
+                  }
+                  
+                }
               }, 
               icon: Icon(Icons.download),
             )
@@ -122,7 +138,7 @@ class _CropPageState extends State<CropPage> {
   }
 
 
-  _savePhoto() async {
+  Future <SaveResult?> _savePhoto() async {
     if(copyOfImage != null){
 
         Uint8List bytes = await copyOfImage!.readAsBytes();
@@ -133,7 +149,9 @@ class _CropPageState extends State<CropPage> {
         quality: 100,
         skipIfExists: false,
     );
+    return result;
     }
+    return null;
   }
 
   Future<bool> checkAndRequestPermissions({required bool skipIfExists}) async {
