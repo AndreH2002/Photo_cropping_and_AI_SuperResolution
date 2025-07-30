@@ -7,6 +7,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:saver_gallery/saver_gallery.dart';
 
+import 'esrgan_service.dart';
+
+
+
 class CropPage extends StatefulWidget {
   const CropPage({super.key, required this.image});
   final File image;
@@ -17,13 +21,14 @@ class CropPage extends StatefulWidget {
 class _CropPageState extends State<CropPage> {
   late File originalImage;
   File? copyOfImage;
+  final esrgan = ESRGAN_Service();
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     originalImage = widget.image;
-
+    esrgan.loadModel();
     _initImageCopy();
   }
 
@@ -64,70 +69,106 @@ class _CropPageState extends State<CropPage> {
               ),
         ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            ElevatedButton.icon(
-              onPressed: () async{
-                if(copyOfImage != null) {
-                  final cropped = await _cropImage(imageFile: copyOfImage!);
-                  if (cropped != null) {
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () async{
+                    if(copyOfImage != null) {
+                      final cropped = await _cropImage(imageFile: copyOfImage!);
+                      if (cropped != null) {
+                        setState(() {
+                          copyOfImage = cropped;
+                        });
+                      }
+                    }
+                    
+                  },
+                  icon: const Icon(Icons.crop),
+                  label: const Text('Crop Image'),
+                  
+                ),
+            
+                ElevatedButton.icon(  
+                  onPressed: () {
                     setState(() {
-                      copyOfImage = cropped;
+                      copyOfImage = originalImage;
                     });
-                  }
-                }
-                
-              },
-              icon: const Icon(Icons.crop),
-              label: const Text('Crop Image'),
-              
-            ),
-        
-            ElevatedButton.icon(  
-              onPressed: () {
-                setState(() {
-                  copyOfImage = originalImage;
-                });
-              },
-        
-              icon: const Icon(Icons.refresh),
-              label: const Text('Revert to original'),
-            ),
+                  },
+            
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Revert to original'),
+                ),
+                    
+                IconButton(
+                  onPressed: () async{
+                    final result = await _savePhoto();
+                    if(result != null) {
+                      if(context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(  
+                        SnackBar(content: Text('Image saved to gallery')),
+                        );
+                      }
+                      
+                    }
+                    else {
+                      if(context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Failed to save image')),
+                        );
+                      }
+                      
+                    }
+                  }, 
+                  icon: Icon(Icons.download),
+                ),
 
-            IconButton(
-              onPressed: () async{
-                final result = await _savePhoto();
-                if(result == null) {
-                  if(context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(  
-                    SnackBar(content: Text('Image saved to gallery')),
-                    );
-                  }
-                  
-                }
-                else {
-                  if(context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to save image')),
-                    );
-                  }
-                  
-                }
-              }, 
-              icon: Icon(Icons.download),
-            )
-          ],
+                ElevatedButton.icon(
+                  label: Text('Enhance'),
+                  onPressed: () async{
+                    if(copyOfImage != null) {
+                      final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+                      if(enhancedImage != null) {
+                        setState(() {
+                          copyOfImage = enhancedImage;
+                        });
+                        if(context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(  
+                          SnackBar(content: Text('Image enhanced successfully')),
+                        );
+                        }
+                        
+                      } 
+                      else {
+                        if(context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(  
+                          SnackBar(content: Text('Enhancement failed')),
+                        );
+                        }
+                        
+                      }
+                    }
+                  },
+                )
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
+
+
+
 
   Future<File?> _cropImage({required File imageFile})  async{
     CroppedFile? croppedImage = 
