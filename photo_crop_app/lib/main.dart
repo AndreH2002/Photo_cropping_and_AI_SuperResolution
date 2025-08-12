@@ -71,8 +71,14 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   ),
                   const SizedBox(height: 20),
+
+
+                  // -- previews the image if available
                   imagePreviewWidget(),
                   const SizedBox(height: 20),
+
+                  // -- Select from gallery --
+
                   ElevatedButton.icon(
                     onPressed: () {
                       _chosePhoto(true);
@@ -83,6 +89,9 @@ class _MyHomePageState extends State<MyHomePage> {
                       minimumSize: const Size.fromHeight(50),
                     ),
                   ),
+
+                  //  -- Chose from camera roll --
+
                   const SizedBox(height: 10),
                   ElevatedButton.icon(
                     onPressed: () {

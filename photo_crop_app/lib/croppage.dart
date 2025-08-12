@@ -23,6 +23,8 @@ class _CropPageState extends State<CropPage> {
   File? copyOfImage;
   final esrgan = ESRGAN_Service();
 
+  bool isEnhancing = false;
+
   @override
   void initState() {
     // TODO: implement initState
@@ -60,7 +62,7 @@ class _CropPageState extends State<CropPage> {
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: copyOfImage == null
+          child: copyOfImage == null || isEnhancing == true
               ? const CircularProgressIndicator()
               : Column(
                 children: [
@@ -81,6 +83,8 @@ class _CropPageState extends State<CropPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
+
+                //Crop button
                 ElevatedButton.icon(
                   onPressed: () async{
                     if(copyOfImage != null) {
@@ -97,7 +101,8 @@ class _CropPageState extends State<CropPage> {
                   label: const Text('Crop Image'),
                   
                 ),
-            
+
+                //Revert Button
                 ElevatedButton.icon(  
                   onPressed: () {
                     setState(() {
@@ -108,7 +113,9 @@ class _CropPageState extends State<CropPage> {
                   icon: const Icon(Icons.refresh),
                   label: const Text('Revert to original'),
                 ),
-                    
+                
+
+                //Save Button
                 IconButton(
                   onPressed: () async{
                     final result = await _savePhoto();
@@ -132,33 +139,38 @@ class _CropPageState extends State<CropPage> {
                   icon: Icon(Icons.download),
                 ),
 
+
+                //Enhance Button
                 ElevatedButton.icon(
-                  label: Text('Enhance'),
-                  onPressed: () async{
-                    if(copyOfImage != null) {
-                      final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
-                      if(enhancedImage != null) {
-                        setState(() {
-                          copyOfImage = enhancedImage;
-                        });
-                        if(context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(  
-                          SnackBar(content: Text('Image enhanced successfully')),
-                        );
-                        }
-                        
-                      } 
-                      else {
-                        if(context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(  
-                          SnackBar(content: Text('Enhancement failed')),
-                        );
-                        }
-                        
-                      }
+                  icon: const Icon(Icons.auto_fix_high),
+                  label: const Text('Enhance'),
+                onPressed: isEnhancing
+                  ? null // Disable while enhancing
+                  : () async {
+                  setState(() => isEnhancing = true);
+
+                  if (copyOfImage != null) {
+                  final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+
+                  setState(() {
+                    if (enhancedImage != null) {
+                      copyOfImage = enhancedImage;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Image enhanced successfully')),
+                      );
+                    } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Enhancement failed')),
+                  );
+                  }
+                  isEnhancing = false;
+                  });
+                  } else {
+                    setState(() => isEnhancing = false);
                     }
                   },
                 )
+
               ],
             ),
           ),
@@ -220,6 +232,6 @@ class _CropPageState extends State<CropPage> {
         : await Permission.photosAddOnly.request().isGranted;
   }
 
-  return false; // Unsupported platforms
+  return false; 
 }
 }
