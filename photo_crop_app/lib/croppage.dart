@@ -78,101 +78,98 @@ class _CropPageState extends State<CropPage> {
             color: Colors.white,
             boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
           ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+          
+              //Crop button
+              ElevatedButton.icon(
+                onPressed: () async{
+                  if(copyOfImage != null) {
+                    final cropped = await _cropImage(imageFile: copyOfImage!);
+                    if (cropped != null) {
+                      setState(() {
+                        copyOfImage = cropped;
+                      });
+                    }
+                  }
+                  
+                },
+                icon: const Icon(Icons.crop),
+                label: const Text('Crop Image'),
+                
+              ),
+          
+              //Revert Button
+              ElevatedButton.icon(  
+                onPressed: () {
+                  setState(() {
+                    copyOfImage = originalImage;
+                  });
+                },
+          
+                icon: const Icon(Icons.refresh),
+                label: const Text('Revert to original'),
+              ),
+              
+            //Enhance Button
+              ElevatedButton.icon(
+                icon: const Icon(Icons.auto_fix_high),
+                label: const Text('Enhance'),
+              onPressed: isEnhancing
+                ? null // Disable while enhancing
+                : () async {
+                setState(() => isEnhancing = true);
+          
+                if (copyOfImage != null) {
+                final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+          
+                setState(() {
+                  if (enhancedImage != null) {
+                    copyOfImage = enhancedImage;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Image enhanced successfully')),
+                    );
+                  } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Enhancement failed')),
+                );
+                }
+                isEnhancing = false;
+                });
+                } else {
+                  setState(() => isEnhancing = false);
+                  }
+                },
+              ),
 
-                //Crop button
-                ElevatedButton.icon(
-                  onPressed: () async{
-                    if(copyOfImage != null) {
-                      final cropped = await _cropImage(imageFile: copyOfImage!);
-                      if (cropped != null) {
-                        setState(() {
-                          copyOfImage = cropped;
-                        });
-                      }
+              //Save Button
+              IconButton(
+                onPressed: () async{
+                  final result = await _savePhoto();
+                  if(result != null) {
+                    if(context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(  
+                      SnackBar(content: Text('Image saved to gallery')),
+                      );
                     }
                     
-                  },
-                  icon: const Icon(Icons.crop),
-                  label: const Text('Crop Image'),
-                  
-                ),
-
-                //Revert Button
-                ElevatedButton.icon(  
-                  onPressed: () {
-                    setState(() {
-                      copyOfImage = originalImage;
-                    });
-                  },
-            
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Revert to original'),
-                ),
-                
-
-                //Save Button
-                IconButton(
-                  onPressed: () async{
-                    final result = await _savePhoto();
-                    if(result != null) {
-                      if(context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(  
-                        SnackBar(content: Text('Image saved to gallery')),
-                        );
-                      }
-                      
-                    }
-                    else {
-                      if(context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Failed to save image')),
-                        );
-                      }
-                      
-                    }
-                  }, 
-                  icon: Icon(Icons.download),
-                ),
-
-
-                //Enhance Button
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.auto_fix_high),
-                  label: const Text('Enhance'),
-                onPressed: isEnhancing
-                  ? null // Disable while enhancing
-                  : () async {
-                  setState(() => isEnhancing = true);
-
-                  if (copyOfImage != null) {
-                  final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
-
-                  setState(() {
-                    if (enhancedImage != null) {
-                      copyOfImage = enhancedImage;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Image enhanced successfully')),
-                      );
-                    } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Enhancement failed')),
-                  );
                   }
-                  isEnhancing = false;
-                  });
-                  } else {
-                    setState(() => isEnhancing = false);
+                  else {
+                    if(context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to save image')),
+                      );
                     }
-                  },
-                )
-
-              ],
-            ),
+                    
+                  }
+                }, 
+                icon: Icon(Icons.download),
+              ),
+          
+            ],
           ),
         ),
       ),
