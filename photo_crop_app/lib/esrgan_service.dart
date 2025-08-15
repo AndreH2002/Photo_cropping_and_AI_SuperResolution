@@ -117,9 +117,9 @@ List _imageToNestedFloat32(img.Image image) {
         (x) {
           final pixel = image.getPixel(x, y);
           return [
-            pixel.r / 127.5 - 1.0,
-            pixel.g / 127.5 - 1.0,
-            pixel.b / 127.5 - 1.0,
+            pixel.r.toDouble(),
+            pixel.g.toDouble(),
+            pixel.b.toDouble(),
           ];
         },
       ),
@@ -139,9 +139,9 @@ img.Image _nestedOutputToImage(List outputBuffer) {
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       final pixel = batch[y][x];
-      final r = ((pixel[0] + 1.0) * 0.5 * 255).clamp(0, 255).toInt();
-      final g = ((pixel[1] + 1.0) * 0.5 * 255).clamp(0, 255).toInt();
-      final b = ((pixel[2] + 1.0) * 0.5 * 255).clamp(0, 255).toInt();
+      final r = pixel[0].clamp(0, 255).toInt();
+      final g = pixel[1].clamp(0, 255).toInt();
+      final b = pixel[2].clamp(0, 255).toInt();
       outImage.setPixelRgba(x, y, r, g, b, 255);
     }
   }

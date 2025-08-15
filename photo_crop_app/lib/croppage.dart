@@ -21,10 +21,14 @@ class CropPage extends StatefulWidget {
 class _CropPageState extends State<CropPage> {
   late File originalImage;
   File? copyOfImage;
+
+  File? secondImage; //this is for once we enhanced to toggle inbetween the enhanced and normal verison
+  bool showingEnhanced = false; 
+
   final esrgan = ESRGAN_Service();
 
   bool isEnhancing = false;
-
+  
   @override
   void initState() {
     // TODO: implement initState
@@ -114,33 +118,61 @@ class _CropPageState extends State<CropPage> {
                 label: const Text('Revert to original'),
               ),
               
-            //Enhance Button
-              ElevatedButton.icon(
-                icon: const Icon(Icons.auto_fix_high),
-                label: const Text('Enhance'),
-              onPressed: isEnhancing
-                ? null // Disable while enhancing
-                : () async {
-                setState(() => isEnhancing = true);
-          
-                if (copyOfImage != null) {
-                final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
-          
-                setState(() {
-                  if (enhancedImage != null) {
-                    copyOfImage = enhancedImage;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Image enhanced successfully')),
-                    );
-                  } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Enhancement failed')),
-                );
-                }
-                isEnhancing = false;
-                });
-                } else {
-                  setState(() => isEnhancing = false);
+            ElevatedButton.icon(
+              icon: isEnhancing
+              ? SizedBox(
+              width: 20,
+              height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+              : Icon(showingEnhanced ? Icons.visibility : Icons.auto_fix_high),
+               label: Text(
+                  isEnhancing
+                  ? 'Enhancing...'
+                  : (showingEnhanced ? 'Show Original' : 'Enhance'),
+                ),
+                onPressed: isEnhancing
+                  ? null
+                  : () async {
+                  if (secondImage == null) {
+                    // Not enhanced yet, run enhancement
+                    setState(() => isEnhancing = true);
+                  
+                    if (copyOfImage != null) {
+                      final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+                      setState(() {
+                      if (enhancedImage != null) {
+                        secondImage = copyOfImage;  // store original
+                        copyOfImage = enhancedImage; // show enhanced
+                        showingEnhanced = true;
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Image enhanced successfully')),
+                      );
+                      } 
+                      else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Enhancement failed')),
+                          );
+                      }
+                      isEnhancing = false;
+                      });
+                    } 
+                    else {
+                      setState(() => isEnhancing = false);
+                    }
+                  } 
+                  else {
+                    // Already enhanced, just toggle between original and enhanced
+                    setState(() {
+                      final placeholder = copyOfImage!;
+                      copyOfImage = secondImage!;
+                      secondImage = placeholder;
+                      showingEnhanced = !showingEnhanced;
+                    });
                   }
                 },
               ),
