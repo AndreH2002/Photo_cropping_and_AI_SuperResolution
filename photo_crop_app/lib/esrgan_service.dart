@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:image/image.dart' as img;
@@ -9,7 +10,7 @@ import 'package:flutter/foundation.dart';
 class ESRGAN_Service {
   String? _modelPath;
 
-  ///Load model
+  /// Load model once
   Future<void> loadModel() async {
     WidgetsFlutterBinding.ensureInitialized();
     try {
@@ -24,20 +25,20 @@ class ESRGAN_Service {
     }
   }
 
-  /// Run the enhancement in the isolate, right now this is only cpu
+  /// Enhance with tiling
   Future<File?> enhanceFile(File inputImage) async {
     if (_modelPath == null) {
       debugPrint("❌ Model not loaded");
       return null;
     }
-    return compute(_enhanceInIsolate, {
+    return compute(_enhanceWithTiling, {
       "imagePath": inputImage.path,
       "modelPath": _modelPath!,
     });
   }
 }
 
-Future<File?> _enhanceInIsolate(Map<String, String> params) async {
+Future<File?> _enhanceWithTiling(Map<String, String> params) async {
   Interpreter? interpreter;
   try {
     final modelFile = File(params["modelPath"]!);
@@ -50,48 +51,55 @@ Future<File?> _enhanceInIsolate(Map<String, String> params) async {
     final decoded = img.decodeImage(await inputFile.readAsBytes());
     if (decoded == null) return null;
 
+    const int tileSize = 512;
+    const int scale = 4;
     final inputH = decoded.height;
     final inputW = decoded.width;
-
-    //1. Resize interpreter input tensor dynamically 
-    interpreter.resizeInputTensor(0, [1, inputH, inputW, 3]);
-    interpreter.allocateTensors();
-
-    debugPrint('Interpreter input shape: ${interpreter.getInputTensor(0).shape}');
-    debugPrint('Interpreter output shape (reported): ${interpreter.getOutputTensor(0).shape}');
-
-    // 2. Prepare the normalized input tensor [-1,1] 
-    final inputTensor = _imageToNestedFloat32(decoded);
-
-    // 3. Allocate nested output buffer 
-    const scale = 4; 
     final outputH = inputH * scale;
     final outputW = inputW * scale;
     final outputC = 3;
 
-    final outputBuffer = List.generate(
-      1,
-      (_) => List.generate(
-        outputH,
-        (_) => List.generate(
-          outputW,
-          (_) => List.filled(outputC, 0.0),
-        ),
-      ),
-    );
+    // Prepare final output image
+    final finalImage = img.Image(width: outputW, height: outputH);
 
-    //4. Run the interpreter
-    interpreter.run(inputTensor, outputBuffer);
+    for (int y = 0; y < inputH; y += tileSize) {
+      for (int x = 0; x < inputW; x += tileSize) {
+        final w = (x + tileSize <= inputW) ? tileSize : (inputW - x);
+        final h = (y + tileSize <= inputH) ? tileSize : (inputH - y);
 
-    // 5. Convert output to image ---
-    final enhancedImage = _nestedOutputToImage(outputBuffer);
+        final tile = _cropImage(decoded, x, y, w, h);
 
+        // Resize interpreter input
+        interpreter.resizeInputTensor(0, [1, h, w, 3]);
+        interpreter.allocateTensors();
 
-    // 6. Save enhanced image ---
+        final inputTensor = _imageToNestedFloat32(tile);
+
+        // Output buffer for this tile
+        final outputBuffer = List.generate(
+          1,
+          (_) => List.generate(
+            h * scale,
+            (_) => List.generate(
+              w * scale,
+              (_) => List.filled(outputC, 0.0),
+            ),
+          ),
+        );
+
+        interpreter.run(inputTensor, outputBuffer);
+
+        final enhancedTile = _nestedOutputToImage(outputBuffer);
+
+        // Paste enhanced tile into final image
+        pasteImage(finalImage, enhancedTile, x * scale, y * scale);
+      }
+    }
+
     final enhancedPath =
         '${inputFile.parent.path}/enhanced_${DateTime.now().millisecondsSinceEpoch}.jpg';
     final enhancedFile =
-        File(enhancedPath)..writeAsBytesSync(img.encodeJpg(enhancedImage, quality: 100));
+        File(enhancedPath)..writeAsBytesSync(img.encodeJpg(finalImage, quality: 100));
 
     interpreter.close();
     return enhancedFile;
@@ -101,8 +109,6 @@ Future<File?> _enhanceInIsolate(Map<String, String> params) async {
     return null;
   }
 }
-
-
 
 /// Converts img.Image to nested Float32 [1, H, W, 3]
 List _imageToNestedFloat32(img.Image image) {
@@ -129,8 +135,7 @@ List _imageToNestedFloat32(img.Image image) {
 
 /// Converts nested output [1,H,W,3] from TFLite directly to img.Image
 img.Image _nestedOutputToImage(List outputBuffer) {
-  final nested = outputBuffer;
-  final batch = nested[0];
+  final batch = outputBuffer[0];
   final height = batch.length;
   final width = batch[0].length;
 
@@ -149,10 +154,9 @@ img.Image _nestedOutputToImage(List outputBuffer) {
   return outImage;
 }
 
-/// Crops image
-img.Image cropImage(img.Image src, int x, int y, int w, int h) {
+/// Copy
+img.Image _cropImage(img.Image src, int x, int y, int w, int h) {
   final cropped = img.Image(width: w, height: h);
-
   for (int yy = 0; yy < h; yy++) {
     for (int xx = 0; xx < w; xx++) {
       final srcX = x + xx;
@@ -165,7 +169,7 @@ img.Image cropImage(img.Image src, int x, int y, int w, int h) {
   return cropped;
 }
 
-/// Pastes one image into another
+/// Paste
 void pasteImage(img.Image dest, img.Image src, int dstX, int dstY) {
   for (int y = 0; y < src.height; y++) {
     for (int x = 0; x < src.width; x++) {
