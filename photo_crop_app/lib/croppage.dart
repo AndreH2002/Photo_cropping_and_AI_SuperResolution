@@ -22,6 +22,7 @@ class _CropPageState extends State<CropPage> {
   late File originalImage;
   File? copyOfImage;
 
+  File? enhancedImage;
   File? secondImage; //this is for once we enhanced to toggle inbetween the enhanced and normal verison
   bool showingEnhanced = false; 
 
@@ -91,11 +92,15 @@ class _CropPageState extends State<CropPage> {
               //Crop button
               ElevatedButton.icon(
                 onPressed: () async{
-                  if(copyOfImage != null) {
+                  //ensure that the image is there and safeguard that the photo isn't enhancing
+                  if(copyOfImage != null && isEnhancing == false) {
                     final cropped = await _cropImage(imageFile: copyOfImage!);
                     if (cropped != null) {
                       setState(() {
                         copyOfImage = cropped;
+                        enhancedImage = null;
+                        secondImage = null;
+                        showingEnhanced = false;
                       });
                     }
                   }
@@ -109,15 +114,20 @@ class _CropPageState extends State<CropPage> {
               //Revert Button
               ElevatedButton.icon(  
                 onPressed: () {
-                  setState(() {
+                  if(isEnhancing == false) {
+                    setState(() {
                     copyOfImage = originalImage;
                   });
+                  }
+                  
                 },
           
                 icon: const Icon(Icons.refresh),
                 label: const Text('Revert to original'),
               ),
-              
+            
+
+            //Enhancement button
             ElevatedButton.icon(
               icon: isEnhancing
               ? SizedBox(
@@ -142,7 +152,7 @@ class _CropPageState extends State<CropPage> {
                     setState(() => isEnhancing = true);
                   
                     if (copyOfImage != null) {
-                      final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+                      enhancedImage = await esrgan.enhanceFile(copyOfImage!);
                       setState(() {
                       if (enhancedImage != null) {
                         secondImage = copyOfImage;  // store original

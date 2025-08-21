@@ -25,7 +25,7 @@ class ESRGAN_Service {
     }
   }
 
-  /// Enhance with tiling
+  /// Return enhancement
   Future<File?> enhanceFile(File inputImage) async {
     if (_modelPath == null) {
       debugPrint("❌ Model not loaded");
@@ -38,6 +38,8 @@ class ESRGAN_Service {
   }
 }
 
+
+///Main tile function
 Future<File?> _enhanceWithTiling(Map<String, String> params) async {
   Interpreter? interpreter;
   try {
@@ -70,12 +72,12 @@ Future<File?> _enhanceWithTiling(Map<String, String> params) async {
         final tile = _cropImage(decoded, x, y, w, h);
 
         // Resize interpreter input
-        interpreter.resizeInputTensor(0, [1, h, w, 3]);
-        interpreter.allocateTensors();
+        //interpreter.resizeInputTensor(0, [1, h, w, 3]);
+        //interpreter.allocateTensors();
 
         final inputTensor = _imageToNestedFloat32(tile);
 
-        // Output buffer for this tile
+        // Output buffer for tile
         final outputBuffer = List.generate(
           1,
           (_) => List.generate(
@@ -110,7 +112,61 @@ Future<File?> _enhanceWithTiling(Map<String, String> params) async {
   }
 }
 
-/// Converts img.Image to nested Float32 [1, H, W, 3]
+
+class _TileResult {
+  final img.Image image;
+  final int x, y;
+  _TileResult(this.image, this.x, this.y);
+}
+
+Future<_TileResult?> _processTileInParallel(Map<String, dynamic> params) async{
+  try {
+    final tileBytes = params["tileBytes"] as List<int>;
+    final tileBytesUint8 = Uint8List.fromList(tileBytes);
+    final x = params["x"] as int;
+    final y = params["y"] as int;
+    final modelPath = params["modelPath"] as String;
+
+    final interpreter = Interpreter.fromFile(File(modelPath));
+    final tile = img.decodeImage(tileBytesUint8)!;
+
+    final inputTensor = _imageToNestedFloat32(tile);
+    const scale = 4;
+    final h = tile.height;
+    final w = tile.width;
+    const outputC = 3;
+
+    final outputBuffer = List.generate(  
+      1,
+      (_) => List.generate(  
+        h * scale,
+        (_) => List.generate(  
+          w * scale,
+          (_) => List.filled(outputC, 0.0),
+        ),
+      ),
+    );
+
+    interpreter.run(inputTensor, outputBuffer);
+    interpreter.close();
+
+    final enhancedTile = _nestedOutputToImage(outputBuffer);
+
+    return _TileResult(enhancedTile, x, y);
+  } catch(e) {
+    debugPrint("❌ Tile processing failed: $e");
+    
+  }
+}
+
+int _decideMaxCores() {
+  final cores = Platform.numberOfProcessors;
+  if(cores <= 2) return 1;
+  return cores > 4 ? 4: cores - 1;
+}
+
+
+/// Converts img.Image to nested float [1, H, W, 3]
 List _imageToNestedFloat32(img.Image image) {
   final width = image.width;
   final height = image.height;
@@ -133,7 +189,7 @@ List _imageToNestedFloat32(img.Image image) {
   );
 }
 
-/// Converts nested output [1,H,W,3] from TFLite directly to img.Image
+/// Converts nested output [1,H,W,3] from TFLite to img.Image
 img.Image _nestedOutputToImage(List outputBuffer) {
   final batch = outputBuffer[0];
   final height = batch.length;
