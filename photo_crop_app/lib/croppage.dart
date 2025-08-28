@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:saver_gallery/saver_gallery.dart';
+
 import 'esrgan_service.dart';
 
 
@@ -20,7 +22,6 @@ class _CropPageState extends State<CropPage> {
   late File originalImage;
   File? copyOfImage;
 
-  File? enhancedImage;
   File? secondImage; //this is for once we enhanced to toggle inbetween the enhanced and normal verison
   bool showingEnhanced = false; 
 
@@ -90,15 +91,11 @@ class _CropPageState extends State<CropPage> {
               //Crop button
               ElevatedButton.icon(
                 onPressed: () async{
-                  //ensure that the image is there and safeguard that the photo isn't enhancing
-                  if(copyOfImage != null && isEnhancing == false) {
+                  if(copyOfImage != null) {
                     final cropped = await _cropImage(imageFile: copyOfImage!);
                     if (cropped != null) {
                       setState(() {
                         copyOfImage = cropped;
-                        enhancedImage = null;
-                        secondImage = null;
-                        showingEnhanced = false;
                       });
                     }
                   }
@@ -112,20 +109,17 @@ class _CropPageState extends State<CropPage> {
               //Revert Button
               ElevatedButton.icon(  
                 onPressed: () {
-                  if(isEnhancing == false) {
-                    setState(() {
+                  setState(() {
                     copyOfImage = originalImage;
+                    showingEnhanced = false;
+                    secondImage = null;
                   });
-                  }
-                  
                 },
           
                 icon: const Icon(Icons.refresh),
                 label: const Text('Revert to original'),
               ),
-            
-
-            //Enhancement button
+              
             ElevatedButton.icon(
               icon: isEnhancing
               ? SizedBox(
@@ -150,7 +144,7 @@ class _CropPageState extends State<CropPage> {
                     setState(() => isEnhancing = true);
                   
                     if (copyOfImage != null) {
-                      enhancedImage = await esrgan.enhanceFile(copyOfImage!);
+                      final enhancedImage = await esrgan.enhanceFile(copyOfImage!);
                       setState(() {
                       if (enhancedImage != null) {
                         secondImage = copyOfImage;  // store original
